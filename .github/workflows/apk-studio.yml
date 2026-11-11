@@ -1,0 +1,183 @@
+# app/src/main/assets/workflow/apk-studio.yml
+name: APK Studio Build
+run-name: APK Studio ${{ inputs.job }}
+on:
+  workflow_dispatch:
+    inputs:
+      job:
+        description: Identificador do job
+        required: true
+      mode:
+        description: release (ZIP enviado) ou repo (codigo do proprio repositorio)
+        required: false
+        default: release
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Obter projeto (repositorio)
+        if: ${{ inputs.mode == 'repo' }}
+        uses: actions/checkout@v5
+        with:
+          path: src
+      - name: Baixar projeto (envio temporario)
+        if: ${{ inputs.mode != 'repo' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB: ${{ inputs.job }}
+        run: |
+          gh release download "job-$JOB" --repo "$GITHUB_REPOSITORY" --pattern project.zip --dir .
+          mkdir src
+          unzip -q project.zip -d src
+      - name: Localizar raiz Gradle
+        id: root
+        run: |
+          R=$(find src -maxdepth 8 -type f -name 'settings.gradle*' -not -path '*/.git/*' -not -path '*/build/*' -printf '%h\n' | awk '{print length, $0}' | sort -n | head -1 | cut -d' ' -f2-)
+          if [ -z "$R" ]; then
+            B=$(find src -maxdepth 8 -type f \( -name 'build.gradle' -o -name 'build.gradle.kts' \) -not -path '*/.git/*' -not -path '*/build/*' -printf '%h\n' | awk '{print length, $0}' | sort -n | head -1 | cut -d' ' -f2-)
+            if [ -n "$B" ]; then
+              echo "settings.gradle ausente: criando um vazio em $B"
+              : > "$B/settings.gradle"
+              R="$B"
+            fi
+          fi
+          if [ -z "$R" ]; then
+            echo "Nenhum settings.gradle(.kts) nem build.gradle(.kts) encontrado no projeto. Conteudo da raiz:"
+            ls -la src | head -50
+            exit 1
+          fi
+          echo "Raiz: $R"
+          echo "dir=$R" >> "$GITHUB_OUTPUT"
+      - name: Detectar Java e Gradle
+        id: cfg
+        working-directory: ${{ steps.root.outputs.dir }}
+        run: |
+          set +e
+          FILES=$(find . -maxdepth 4 -type f \( -name '*.gradle' -o -name '*.gradle.kts' -o -name '*.toml' -o -name 'gradle.properties' \) -not -path '*/build/*' -not -path '*/.git/*')
+          WRAP=""
+          if [ -f gradlew ] && [ -f gradle/wrapper/gradle-wrapper.jar ]; then
+            WRAP=$(grep -oE 'gradle-[0-9]+(\.[0-9]+)*' gradle/wrapper/gradle-wrapper.properties 2>/dev/null | head -1 | sed 's/^gradle-//')
+          fi
+          AGP=""
+          if [ -n "$FILES" ]; then
+            AGP=$(grep -hoE 'com\.android\.tools\.build:gradle:[0-9]+\.[0-9]+' $FILES | head -1 | grep -oE '[0-9]+\.[0-9]+$')
+            [ -z "$AGP" ] && AGP=$(grep -hoE 'com\.android\.(application|library)[^0-9]{0,24}[0-9]+\.[0-9]+' $FILES | head -1 | grep -oE '[0-9]+\.[0-9]+$')
+            [ -z "$AGP" ] && AGP=$(grep -hoE '^(agp|androidGradlePlugin|android-gradle-plugin)[[:space:]]*=[[:space:]]*"[0-9]+\.[0-9]+' $FILES | head -1 | grep -oE '[0-9]+\.[0-9]+$')
+          fi
+          GRADLE=""
+          if [ -z "$WRAP" ]; then
+            case "$AGP" in
+              9.*) GRADLE=9.1.0 ;;
+              8.13|8.12|8.11) GRADLE=8.13 ;;
+              8.10|8.9) GRADLE=8.11.1 ;;
+              8.8) GRADLE=8.10.2 ;;
+              8.7) GRADLE=8.9 ;;
+              8.6|8.5) GRADLE=8.7 ;;
+              8.4) GRADLE=8.6 ;;
+              8.3) GRADLE=8.4 ;;
+              8.2) GRADLE=8.2 ;;
+              8.1|8.0) GRADLE=8.0 ;;
+              7.4) GRADLE=7.5 ;;
+              7.3) GRADLE=7.4 ;;
+              7.2) GRADLE=7.3.3 ;;
+              7.1) GRADLE=7.2 ;;
+              7.0) GRADLE=7.0 ;;
+              *) GRADLE=8.9 ;;
+            esac
+          fi
+          GV="${WRAP:-$GRADLE}"
+          J=17
+          if [ -n "$FILES" ]; then
+            MAXJ=$(grep -hoE '(jvmToolchain\(|JavaLanguageVersion\.of\(|VERSION_|jvmTarget[^0-9]{0,6})[0-9]+' $FILES | grep -oE '[0-9]+$' | sort -n | tail -1)
+            [ -n "$MAXJ" ] && [ "$MAXJ" -ge 21 ] && J=21
+          fi
+          if [ -n "$GV" ] && [ "$(printf '%s\n8.5\n' "$GV" | sort -V | head -1)" != "8.5" ] && [ "$J" = "21" ]; then J=17; fi
+          if [ -n "$GV" ] && [ "$(printf '%s\n7.3\n' "$GV" | sort -V | head -1)" != "7.3" ]; then J=11; fi
+          if [ "$J" = "21" ]; then O=17; else O=21; fi
+          [ "$J" = "11" ] && O=17
+          echo "AGP: ${AGP:-nao identificado} | Gradle: ${GV:-wrapper} | Java: $J"
+          {
+            echo "gradle=$GRADLE"
+            echo "j1=$O"
+            echo "j2=$J"
+            echo "envs=JAVA_HOME_${O}_X64,JAVA_HOME_${J}_X64"
+          } >> "$GITHUB_OUTPUT"
+      - name: Preparar Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: |
+            ${{ steps.cfg.outputs.j1 }}
+            ${{ steps.cfg.outputs.j2 }}
+      - name: Preparar Gradle e SDK
+        uses: gradle/actions/setup-gradle@v5
+        with:
+          gradle-version: ${{ steps.cfg.outputs.gradle }}
+      - name: Aceitar licencas do SDK
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+      - name: Compilar (assembleDebug)
+        shell: bash
+        working-directory: ${{ steps.root.outputs.dir }}
+        run: |
+          LOG="$RUNNER_TEMP/build.log"
+          printf 'sdk.dir=%s\n' "$ANDROID_HOME" > local.properties
+          [ -f gradle.properties ] && sed -i '/^org\.gradle\.java\.home/d' gradle.properties
+          rm -rf ./*/build ./*/.cxx
+          if [ -f gradlew ] && [ -f gradle/wrapper/gradle-wrapper.jar ]; then chmod +x gradlew; GW=./gradlew; else GW=gradle; fi
+          OPTS="--no-daemon --console=plain --warning-mode=none -Dorg.gradle.java.installations.fromEnv=${{ steps.cfg.outputs.envs }}"
+          set +e
+          $GW $OPTS assembleDebug 2>&1 | tee "$LOG"
+          S=${PIPESTATUS[0]}
+          if [ "$S" -ne 0 ] && grep -qE 'Could not (resolve|GET|HEAD)|Read timed out|Connection (reset|timed out)|Premature end of Content-Length|Received status code 5[0-9][0-9]|Remote host terminated|Unable to tunnel' "$LOG"; then
+            echo "Falha de rede ao baixar dependencias: tentando de novo"
+            $GW $OPTS --refresh-dependencies assembleDebug 2>&1 | tee "$LOG"
+            S=${PIPESTATUS[0]}
+          fi
+          exit "$S"
+      - name: Validar e coletar APK
+        working-directory: ${{ steps.root.outputs.dir }}
+        run: |
+          APK=$(find . -path '*build/outputs/apk/debug/*.apk' | head -1)
+          [ -n "$APK" ] || { echo "APK debug nao encontrado"; exit 1; }
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          cp "$APK" "$GITHUB_WORKSPACE/out/app.apk"
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          B=$("$BT/aapt" dump badging "$APK" || true)
+          g() { echo "$B" | sed -n "$1" | head -1; }
+          SIG=fail
+          "$BT/apksigner" verify "$APK" > /dev/null 2>&1 && SIG=ok
+          {
+            echo "package=$(g "s/^package: name='\([^']*\)'.*/\1/p")"
+            echo "versionCode=$(g "s/.*versionCode='\([^']*\)'.*/\1/p")"
+            echo "versionName=$(g "s/.*versionName='\([^']*\)'.*/\1/p")"
+            echo "minSdk=$(g "s/^sdkVersion:'\([^']*\)'.*/\1/p")"
+            echo "targetSdk=$(g "s/^targetSdkVersion:'\([^']*\)'.*/\1/p")"
+            echo "label=$(g "s/^application-label:'\([^']*\)'.*/\1/p")"
+            echo "permissions=$(echo "$B" | grep -c '^uses-permission' || true)"
+            echo "signature=$SIG"
+            echo "sha256=$(sha256sum "$APK" | cut -d' ' -f1)"
+          } > "$GITHUB_WORKSPACE/out/info.txt"
+          cat "$GITHUB_WORKSPACE/out/info.txt"
+      - name: Publicar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-${{ inputs.job }}
+          path: out/
+          retention-days: 1
+      - name: Resumo do erro
+        if: ${{ failure() }}
+        run: |
+          L="$RUNNER_TEMP/build.log"
+          {
+            echo "APKSTUDIO-ERRO-INICIO"
+            if [ -s "$L" ]; then
+              awk '/^\* What went wrong:/{f=1;next} /^\* Try:/{f=0} f' "$L" | grep -v '^$' | head -30
+              grep -E '^e: |error: |Execution failed for task|Duplicate class|AAPT: error|Unresolved reference|Could not (resolve|find|GET)|SDK location not found|Minimum supported Gradle|requires Java|OutOfMemoryError|Java heap space|Unsupported class file|compile against version' "$L" | grep -vE '^[[:space:]]*at ' | head -30
+            else
+              echo "O Gradle nao chegou a rodar. Abra o log completo da execucao no GitHub."
+            fi
+            echo "APKSTUDIO-ERRO-FIM"
+          } | sed -E 's#/home/runner/work/[^/]+/[^/]+/##g' | awk '!s[$0]++ || /APKSTUDIO/'
