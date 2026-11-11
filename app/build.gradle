@@ -1,84 +1,66 @@
 plugins {
     id 'com.android.application'
 }
-
 android {
     namespace 'com.zyon.virtualpc'
     compileSdk 34
-
+    signingConfigs {
+        release {
+            def ksPath = System.getenv("ZYON_KEYSTORE_PATH")
+            if (ksPath != null && !ksPath.isEmpty()) {
+                storeFile file(ksPath)
+                storePassword System.getenv("ZYON_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("ZYON_KEY_ALIAS")
+                keyPassword System.getenv("ZYON_KEY_PASSWORD")
+            }
+        }
+    }
     defaultConfig {
         applicationId "com.zyon.virtualpc"
         minSdk 28
         targetSdk 34
-        versionCode 18
-        versionName "18.0.0"
-
+        versionCode 19
+        versionName "19.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-
-        ndk {
-            abiFilters 'arm64-v8a'
-        }
-
+        ndk { abiFilters 'arm64-v8a' }
         externalNativeBuild {
             cmake {
                 cppFlags "-std=c++20 -frtti -fexceptions -Wall -Wextra -O2"
-                arguments "-DANDROID_STL=c++_shared",
-                          "-DANDROID_PLATFORM=android-28",
-                          "-DZYON_VERSION=17"
+                arguments "-DANDROID_STL=c++_shared", "-DANDROID_PLATFORM=android-28", "-DZYON_VERSION=17"
             }
         }
-
-        // 16 GB max guest RAM is configurable only on devices that can actually allocate it
         buildConfigField "long", "MAX_GUEST_RAM_BYTES", "17179869184L"
         buildConfigField "String", "QEMU_SYSTEM_X86_64", "\"qemu-system-x86_64\""
         buildConfigField "String", "QEMU_SYSTEM_AARCH64", "\"qemu-system-aarch64\""
     }
-
     buildTypes {
         release {
+            signingConfig signingConfigs.release
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
-        debug {
-            jniDebuggable true
-        }
+        debug { jniDebuggable true }
     }
-
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
-
     externalNativeBuild {
-        cmake {
-            path file('src/main/cpp/CMakeLists.txt')
-            version '3.22.1'
-        }
+        cmake { path file('src/main/cpp/CMakeLists.txt'); version '3.22.1' }
     }
-
     packaging {
-        jniLibs {
-            useLegacyPackaging = true
-        }
-        resources {
-            excludes += ['META-INF/LICENSE*', 'META-INF/NOTICE*']
-        }
+        jniLibs { useLegacyPackaging = true }
+        resources { excludes += ['META-INF/LICENSE*', 'META-INF/NOTICE*'] }
     }
-
     sourceSets {
         main {
             jniLibs.srcDirs = ['src/main/jniLibs']
             assets.srcDirs = ['src/main/assets']
         }
     }
-
-    buildFeatures {
-        buildConfig true
-        viewBinding true
-    }
+    buildFeatures { buildConfig true; viewBinding true }
 }
-
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.11.0'
