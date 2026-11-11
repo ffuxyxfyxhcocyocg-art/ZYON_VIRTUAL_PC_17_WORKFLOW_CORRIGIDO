@@ -75,6 +75,8 @@ jobs:
           VERSION_CODE="${VERSION%%.*}"
           echo "ZYON_VERSION_NAME=$VERSION" >> "$GITHUB_ENV"
           echo "ZYON_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          export ZYON_VERSION_NAME="$VERSION"
+          export ZYON_VERSION_CODE="$VERSION_CODE"
           ./gradlew --no-daemon --stacktrace assembleRelease
       - name: Generate SHA-256 checksum
         run: |
