@@ -64,8 +64,6 @@ jobs:
       - run: chmod +x ./gradlew
       - name: Build signed release APK
         env:
-          ZYON_VERSION_NAME: ${GITHUB_REF_NAME#v}
-          ZYON_VERSION_CODE: ${GITHUB_REF_NAME#v}
           ZYON_KEYSTORE_PASSWORD: ${{ secrets.ZYON_KEYSTORE_PASSWORD }}
           ZYON_KEY_ALIAS: ${{ secrets.ZYON_KEY_ALIAS }}
           ZYON_KEY_PASSWORD: ${{ secrets.ZYON_KEY_PASSWORD }}
@@ -73,6 +71,10 @@ jobs:
           test -n "$ZYON_KEYSTORE_PASSWORD"
           test -n "$ZYON_KEY_ALIAS"
           test -n "$ZYON_KEY_PASSWORD"
+          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION_CODE="${VERSION%%.*}"
+          echo "ZYON_VERSION_NAME=$VERSION" >> "$GITHUB_ENV"
+          echo "ZYON_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
           ./gradlew --no-daemon --stacktrace assembleRelease
       - name: Generate SHA-256 checksum
         run: |
