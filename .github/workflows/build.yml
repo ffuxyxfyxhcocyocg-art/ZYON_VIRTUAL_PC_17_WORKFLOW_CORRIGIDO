@@ -72,8 +72,15 @@ jobs:
           test -n "$ZYON_KEY_ALIAS"
           test -n "$ZYON_KEY_PASSWORD"
           ./gradlew --no-daemon --stacktrace assembleRelease
-      - name: Publish APK in GitHub Releases
+      - name: Generate SHA-256 checksum
+        run: |
+          APK=$(find app/build/outputs/apk/release -maxdepth 1 -name '*.apk' -print -quit)
+          test -n "$APK"
+          sha256sum "$APK" > "$APK.sha256"
+      - name: Publish APK and checksum in GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: app/build/outputs/apk/release/*.apk
+          files: |
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/apk/release/*.apk.sha256
