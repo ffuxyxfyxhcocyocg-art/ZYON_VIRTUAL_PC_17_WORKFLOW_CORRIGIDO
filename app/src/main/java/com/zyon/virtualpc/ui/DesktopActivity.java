@@ -231,7 +231,6 @@ public class DesktopActivity extends AppCompatActivity {
             case KeyEvent.KEYCODE_ALT_LEFT:
             case KeyEvent.KEYCODE_ALT_RIGHT:
                 altKeyDown = true; break;
-            case KeyEvent.KEYCODE_SUPER_LEFT:
             case KeyEvent.KEYCODE_META_LEFT:
                 // tecla Windows: abrir/fechar menu Iniciar
                 if (startOpen) closeStart(); else openStart(false);
@@ -290,7 +289,7 @@ public class DesktopActivity extends AppCompatActivity {
         tools.add(new Tool("🖱️", "Mouse", () -> startActivity(new Intent(this, MouseSettingsActivity.class))));
         tools.add(new Tool("⌨️", "Teclado / Mapeamento", () -> startActivity(new Intent(this, KeyboardMappingActivity.class))));
         tools.add(new Tool("📁", "Arquivos", () -> openWindow("📁 Arquivos", "📁",
-                new DesktopApps.FileManagerView(this, sharedRoot), 460, 400)));
+                new DesktopApps.FileExplorerView(this, sharedRoot), 460, 400)));
         tools.add(new Tool("📊", "Gerenciador de Tarefas", () -> openWindow("📊 Gerenciador", "📊",
                 new DesktopApps.TaskManagerView(this), 400, 350)));
         tools.add(new Tool("⚙️", "Configurações", () -> startActivity(new Intent(this, SettingsActivity.class))));
@@ -376,7 +375,7 @@ public class DesktopActivity extends AppCompatActivity {
     private void handleDesktopIconClick(String name) {
         switch (name) {
             case "PC Virtual":    startActivity(new Intent(this, VmConsoleActivity.class)); break;
-            case "Arquivos":      openWindow("📁 Arquivos", "📁", new DesktopApps.FileManagerView(this, sharedRoot), 460, 400); break;
+            case "Arquivos":      openWindow("📁 Arquivos", "📁", new DesktopApps.FileExplorerView(this, sharedRoot), 460, 400); break;
             case "Jogos":         startActivity(new Intent(this, GameLauncherActivity.class)); break;
             case "Configurações": startActivity(new Intent(this, SettingsActivity.class)); break;
         }
@@ -580,7 +579,7 @@ public class DesktopActivity extends AppCompatActivity {
 
     private void launchApp(AppCatalog.Entry e) {
         try {
-            Intent intent = getPackageManager().getLaunchIntentForPackage(e.packageName);
+            Intent intent = getPackageManager().getLaunchIntentForPackage(e.pkg);
             if (intent != null) startActivity(intent);
             else toast("App não pode ser aberto.");
         } catch (Exception ex) { toast("Erro: " + ex.getMessage()); }
