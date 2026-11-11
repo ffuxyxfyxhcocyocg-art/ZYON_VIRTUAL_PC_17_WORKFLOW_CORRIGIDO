@@ -64,6 +64,8 @@ jobs:
       - run: chmod +x ./gradlew
       - name: Build signed release APK
         env:
+          ZYON_VERSION_NAME: ${GITHUB_REF_NAME#v}
+          ZYON_VERSION_CODE: ${GITHUB_REF_NAME#v}
           ZYON_KEYSTORE_PASSWORD: ${{ secrets.ZYON_KEYSTORE_PASSWORD }}
           ZYON_KEY_ALIAS: ${{ secrets.ZYON_KEY_ALIAS }}
           ZYON_KEY_PASSWORD: ${{ secrets.ZYON_KEY_PASSWORD }}
