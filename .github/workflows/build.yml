@@ -1,83 +1,79 @@
-name: Build ZYON VIRTUAL PC 17
-
+name: Build and Release ZYON Virtual PC
 on:
   push:
     branches: [ main, master ]
+    tags: [ 'v*' ]
   pull_request:
   workflow_dispatch:
-
 permissions:
   contents: read
-
 concurrency:
-  group: zyon-android-build-${{ github.ref }}
+  group: zyon-android-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
-  build:
-    name: Build Android debug APK
+  debug:
+    if: github.event_name == 'pull_request' || github.ref_type != 'tag'
     runs-on: ubuntu-latest
     timeout-minutes: 90
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v4
-
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: android-actions/setup-android@v4
       - name: Install Android SDK components
         run: |
           yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager --install \
-            "platform-tools" \
-            "platforms;android-34" \
-            "build-tools;34.0.0" \
-            "ndk;26.1.10909125" \
-            "cmake;3.22.1"
-
-      - name: Verify project files
-        run: |
-          test -f settings.gradle
-          test -f build.gradle
-          test -f app/build.gradle
-          test -f app/src/main/cpp/CMakeLists.txt
-          echo "Project files found."
-
-      - name: Make Gradle wrapper executable
-        run: chmod +x ./gradlew
-
+          sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0" "ndk;26.1.10909125" "cmake;3.22.1"
+      - run: chmod +x ./gradlew
       - name: Build debug APK
-        run: ./gradlew --no-daemon --stacktrace --warning-mode all assembleDebug
-        env:
-          ANDROID_HOME: ${{ env.ANDROID_HOME }}
-          ANDROID_SDK_ROOT: ${{ env.ANDROID_HOME }}
-
-      - name: Upload APK
-        if: success()
-        uses: actions/upload-artifact@v4
+        run: ./gradlew --no-daemon --stacktrace assembleDebug
+      - uses: actions/upload-artifact@v4
         with:
-          name: zyon-virtual-pc-17-debug-apk
+          name: zyon-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
-
-      - name: Upload build diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
+  release:
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
-          name: zyon-build-diagnostics
-          path: |
-            app/build/reports/**
-            app/build/outputs/logs/**
-          if-no-files-found: ignore
-          retention-days: 7
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: android-actions/setup-android@v4
+      - name: Install Android SDK components
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0" "ndk;26.1.10909125" "cmake;3.22.1"
+      - name: Decode permanent signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.ZYON_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$KEYSTORE_B64" || (echo "Missing ZYON_KEYSTORE_BASE64 secret" && exit 1)
+          echo "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/zyon-release.jks"
+          echo "ZYON_KEYSTORE_PATH=$RUNNER_TEMP/zyon-release.jks" >> "$GITHUB_ENV"
+      - run: chmod +x ./gradlew
+      - name: Build signed release APK
+        env:
+          ZYON_KEYSTORE_PASSWORD: ${{ secrets.ZYON_KEYSTORE_PASSWORD }}
+          ZYON_KEY_ALIAS: ${{ secrets.ZYON_KEY_ALIAS }}
+          ZYON_KEY_PASSWORD: ${{ secrets.ZYON_KEY_PASSWORD }}
+        run: |
+          test -n "$ZYON_KEYSTORE_PASSWORD"
+          test -n "$ZYON_KEY_ALIAS"
+          test -n "$ZYON_KEY_PASSWORD"
+          ./gradlew --no-daemon --stacktrace assembleRelease
+      - name: Publish APK in GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: app/build/outputs/apk/release/*.apk

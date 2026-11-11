@@ -33,6 +33,10 @@ public class SettingsActivity extends AppCompatActivity {
         title.setPadding(0, 0, 0, dp(this, 20));
         root.addView(title);
 
+        addButton(root, "☁️  Atualizações do ZYON (GitHub)", () ->
+            startActivity(new Intent(this, UpdaterActivity.class)));
+        addDivider(root);
+
         // Tema escuro/claro
         LinearLayout row1 = new LinearLayout(this);
         row1.setOrientation(LinearLayout.HORIZONTAL);
