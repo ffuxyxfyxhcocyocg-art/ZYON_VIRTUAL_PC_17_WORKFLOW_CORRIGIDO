@@ -1,0 +1,11 @@
+ZYON VIRTUAL PC 16 — application code
+Copyright (c) 2026
+
+This project's original source (Java/C++ wrappers, UI, managers) is provided
+as-is for use with QEMU.
+
+QEMU is GPL-2.0: https://www.qemu.org/license/
+OVMF/edk2: BSD-2-Clause-Patent
+SeaBIOS: LGPL
+
+You must comply with the licenses of any prebuilt binaries you ship.

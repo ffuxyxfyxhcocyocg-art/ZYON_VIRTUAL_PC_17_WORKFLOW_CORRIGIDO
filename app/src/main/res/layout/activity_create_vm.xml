@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <EditText
+            android:id="@+id/et_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Nome da VM"
+            android:inputType="text" />
+
+        <Spinner
+            android:id="@+id/sp_arch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" />
+
+        <EditText
+            android:id="@+id/et_cores"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Núcleos de CPU"
+            android:inputType="number"
+            android:layout_marginTop="8dp" />
+
+        <EditText
+            android:id="@+id/et_ram_mb"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="RAM (MB) — máx 16384"
+            android:inputType="number"
+            android:layout_marginTop="8dp" />
+
+        <Button
+            android:id="@+id/btn_create"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/create_vm"
+            android:layout_marginTop="16dp" />
+    </LinearLayout>
+</ScrollView>

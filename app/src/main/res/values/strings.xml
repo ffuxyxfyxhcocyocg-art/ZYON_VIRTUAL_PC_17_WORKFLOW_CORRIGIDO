@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ZYON VIRTUAL PC 17</string>
+    <string name="create_vm">Criar Máquina</string>
+    <string name="start">Iniciar</string>
+    <string name="stop">Parar</string>
+    <string name="pause">Pausar</string>
+    <string name="resume">Retomar</string>
+    <string name="hardware">Hardware</string>
+    <string name="snapshots">Snapshots</string>
+    <string name="settings">Configurações</string>
+    <string-array name="arch_options">
+        <item>x86_64</item>
+        <item>ARM64</item>
+        <item>x86</item>
+        <item>ARM</item>
+    </string-array>
+</resources>
